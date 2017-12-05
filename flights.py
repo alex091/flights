@@ -79,7 +79,6 @@ if __name__ == '__main__':
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             future_to_url = {executor.submit(port.load_url): port for port in airport_list}
 
-        end = time()
         for port in airport_list:
             port.fetch_data()
         airport_list.sort(key=lambda airport: airport.weather.get('wind', {}).get('speed', {}).get('kmh', 0))
