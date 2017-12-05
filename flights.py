@@ -17,19 +17,6 @@ Departures: {departures}
 """
 
 
-def load_url(url):
-    try:
-        resp = requests.get(url, headers=HEADERS)
-        if resp.ok:
-            data = resp.json()
-
-
-    except Exception as e:
-        print('Fail to load data: {}'.format(e))
-
-
-
-
 class Airport(object):
     def __init__(self, icao_code):
         self.url = '{}?code={}&timestamp={}'.format(BASE_URL,
