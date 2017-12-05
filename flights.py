@@ -1,4 +1,5 @@
 import argparse
+import concurrent.futures
 from time import strftime, time, localtime
 
 import requests
@@ -16,6 +17,19 @@ Departures: {departures}
 """
 
 
+def load_url(url):
+    try:
+        resp = requests.get(url, headers=HEADERS)
+        if resp.ok:
+            data = resp.json()
+
+
+    except Exception as e:
+        print('Fail to load data: {}'.format(e))
+
+
+
+
 class Airport(object):
     def __init__(self, icao_code):
         self.url = '{}?code={}&timestamp={}'.format(BASE_URL,
@@ -26,19 +40,25 @@ class Airport(object):
         self.arrivals = []
         self.departures = []
         self.weather = {}
+        self.data = {}
 
-    def fetch_data(self):
+    def load_url(self):
         try:
             resp = requests.get(self.url, headers=HEADERS)
             if resp.ok:
                 jdata = resp.json()
-                data = jdata['result']['response']['airport']['pluginData']
-                self.name = data.get('details', {}).get('name')
-                for flight in data.get('schedule', {}).get('arrivals', {}).get('data', []):
-                    self.arrivals.append(self._get_flight_data(flight))
-                for flight in data.get('schedule', {}).get('departures', {}).get('data', []):
-                    self.departures.append(self._get_flight_data(flight))
-                self.weather = data.get('weather', {})
+                self.data = jdata['result']['response']['airport']['pluginData']
+        except Exception as e:
+            print('Fail to load data: {}'.format(e))
+
+    def fetch_data(self):
+        try:
+            self.name = self.data.get('details', {}).get('name')
+            for flight in self.data.get('schedule', {}).get('arrivals', {}).get('data', []):
+                self.arrivals.append(self._get_flight_data(flight))
+            for flight in self.data.get('schedule', {}).get('departures', {}).get('data', []):
+                self.departures.append(self._get_flight_data(flight))
+            self.weather = self.data.get('weather', {})
 
         except Exception as e:
             print('Fail to fetch data with error: {}'.format(e))
@@ -68,9 +88,15 @@ if __name__ == '__main__':
         airport_list = []
         for airport in airports:
             port = Airport(airport)
-            port.fetch_data()
             airport_list.append(port)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_url = {executor.submit(port.load_url): port for port in airport_list}
+
+        end = time()
+        for port in airport_list:
+            port.fetch_data()
         airport_list.sort(key=lambda airport: airport.weather.get('wind', {}).get('speed', {}).get('kmh', 0))
+
         for airport in airport_list:
             print(airport)
     else:
